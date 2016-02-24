@@ -9,7 +9,6 @@
 #define __clunet_h_included__
 
 #include "bits.h"
-#include "defines.h"
 #include "commands.h"
 
 #include "clunet_config.h"
@@ -17,7 +16,7 @@
 class Clunet
 {
 public:
-    Clunet(unsigned char devId = 0);
+    Clunet(unsigned char devId);
 
     // Инициализация
     void init();
@@ -26,14 +25,14 @@ public:
     void send(unsigned char address, unsigned char prio, unsigned char command, char* data, unsigned char size);
 
     // Возвращает 0, если готов к передаче, иначе приоритет текущей задачи
-    int ready_to_send();
+    int readyToSend();
 
     // Установка функций, которые вызываются при получении пакетов
     // Эта - получает пакеты, которые адресованы нам
-    void set_on_data_received(void (*f)(unsigned char src_address, unsigned char dst_address, unsigned char command, char* data, unsigned char size));
+    void setOnDataReceived(void (*f)(unsigned char src_address, unsigned char dst_address, unsigned char command, char* data, unsigned char size));
 
     // А эта - абсолютно все, которые ходят по сети, включая наши
-    void set_on_data_received_sniff(void (*f)(unsigned char src_address, unsigned char dst_address, unsigned char command, char* data, unsigned char size));
+    void setOnDataReceivedSniff(void (*f)(unsigned char src_address, unsigned char dst_address, unsigned char command, char* data, unsigned char size));
 
     void setDeviceName(char *name);
     char* deviceName() {return devName;}

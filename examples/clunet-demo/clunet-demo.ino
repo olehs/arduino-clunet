@@ -13,12 +13,12 @@ void data_received(unsigned char src_address, unsigned char dst_address, unsigne
     Serial.println(data);
 }
 
-Clunet clunet;
+Clunet clunet(1);
 
 void setup (void)
 {
     Serial.begin(115200);
-    clunet.set_on_data_received(data_received);
+    clunet.setOnDataReceived(data_received);
     clunet.init();
 }
 
@@ -27,7 +27,13 @@ void loop (void)
 {
     char buffer[1];
     buffer[0] = 1;
-    clunet.send(CLUNET_BROADCAST_ADDRESS, CLUNET_PRIORITY_MESSAGE, CLUNET_COMMAND_DEVICE_POWER_INFO, buffer, sizeof(buffer));
+    clunet.send(
+      CLUNET_BROADCAST_ADDRESS, 
+      CLUNET_PRIORITY_MESSAGE, 
+      CLUNET_COMMAND_DEVICE_POWER_INFO, 
+      buffer, 
+      sizeof(buffer)
+    );
 
     delay(1000);
 }

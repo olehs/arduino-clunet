@@ -139,7 +139,9 @@ void Clunet::handleTimerComp()
 void Clunet::handleTimerOvf()
 {
     if (clunetTimerPeriods < 3)
-            clunetTimerPeriods++;
+    {
+        clunetTimerPeriods++;
+    }
     else // Слишком долго нет сигнала, сброс и отключение прерывания
     {
             CLUNET_SEND_0; 					// А вдруг мы забыли линию отжать? Хотя по идее не должно...
@@ -206,6 +208,8 @@ void Clunet::handleInterrupt()
                                             data_received(dataToRead[CLUNET_OFFSET_SRC_ADDRESS], dataToRead[CLUNET_OFFSET_DST_ADDRESS], dataToRead[CLUNET_OFFSET_COMMAND], (char*)(dataToRead+CLUNET_OFFSET_DATA), dataToRead[CLUNET_OFFSET_SIZE]);
                             }
                             break;
+                    default:
+                            break;
             }
     }
     else
@@ -218,22 +222,22 @@ void Clunet::handleInterrupt()
 
 char Clunet::check_crc(char* data, unsigned char size)
 {
-      uint8_t crc=0;
-      uint8_t i,j;
-      for (i=0; i<size;i++)
-      {
-            uint8_t inbyte = data[i];
-            for (j=0;j<8;j++)
-            {
-                  uint8_t mix = (crc ^ inbyte) & 0x01;
-                  crc >>= 1;
-                  if (mix)
-                        crc ^= 0x8C;
+    uint8_t crc=0;
+    uint8_t i,j;
+    for (i=0; i<size;i++)
+    {
+        uint8_t inbyte = data[i];
+        for (j=0;j<8;j++)
+        {
+              uint8_t mix = (crc ^ inbyte) & 0x01;
+              crc >>= 1;
+              if (mix)
+                    crc ^= 0x8C;
 
-                  inbyte >>= 1;
-            }
-      }
-      return crc;
+              inbyte >>= 1;
+        }
+    }
+    return crc;
 }
 
 ISR(CLUNET_TIMER_COMP_VECTOR)
@@ -244,12 +248,12 @@ ISR(CLUNET_TIMER_COMP_VECTOR)
 
 void Clunet::start_send()
 {
-        CLUNET_SEND_0;
-        if (clunetSendingState != CLUNET_SENDING_STATE_PREINIT) // Если не нужна пауза...
-                clunetSendingState = CLUNET_SENDING_STATE_INIT; // Инициализация передачи
-        clunetSendingCurrentByte = clunetSendingCurrentBit = 0; // Обнуляем счётчик
-        CLUNET_TIMER_REG_OCR = CLUNET_TIMER_REG+CLUNET_T;			// Планируем таймер, обычно почему-то прерывание срабатывает сразу
-        CLUNET_ENABLE_TIMER_COMP;			// Включаем прерывание таймера-сравнения
+    CLUNET_SEND_0;
+    if (clunetSendingState != CLUNET_SENDING_STATE_PREINIT) // Если не нужна пауза...
+            clunetSendingState = CLUNET_SENDING_STATE_INIT; // Инициализация передачи
+    clunetSendingCurrentByte = clunetSendingCurrentBit = 0; // Обнуляем счётчик
+    CLUNET_TIMER_REG_OCR = CLUNET_TIMER_REG+CLUNET_T;			// Планируем таймер, обычно почему-то прерывание срабатывает сразу
+    CLUNET_ENABLE_TIMER_COMP;			// Включаем прерывание таймера-сравнения
 }
 
 void Clunet::send(unsigned char address, unsigned char prio, unsigned char command, char* data, unsigned char size)
@@ -286,54 +290,54 @@ void Clunet::send(unsigned char address, unsigned char prio, unsigned char comma
 
 inline void Clunet::data_received(unsigned char src_address, unsigned char dst_address, unsigned char command, char* data, unsigned char size)
 {	
-        if (on_data_received_sniff)
-                (*on_data_received_sniff)(src_address, dst_address, command, data, size);
+    if (on_data_received_sniff)
+            (*on_data_received_sniff)(src_address, dst_address, command, data, size);
 
-        if (src_address == device_id) return; // Игнорируем сообщения от самого себя!
+    if (src_address == device_id) return; // Игнорируем сообщения от самого себя!
 
-        if ((dst_address != device_id) &&
-                (dst_address != CLUNET_BROADCAST_ADDRESS)) return; // Игнорируем сообщения не для нас
+    if ((dst_address != device_id) &&
+            (dst_address != CLUNET_BROADCAST_ADDRESS)) return; // Игнорируем сообщения не для нас
 
-        if (command == CLUNET_COMMAND_REBOOT) // Просто ребут. И да, ребутнуть себя мы можем
-        {
-                #if defined(__AVR_ATmega8__)
-                  cli();
-                  set_bit(WDTCR, WDE);
-                  while(1);
-                #elif defined(__AVR_ATmega328P__)
+    if (command == CLUNET_COMMAND_REBOOT) // Просто ребут. И да, ребутнуть себя мы можем
+    {
+            #if defined(__AVR_ATmega8__)
+              cli();
+              set_bit(WDTCR, WDE);
+              while(1);
+            #elif defined(__AVR_ATmega328P__)
 //		  cli();
 //		  wdt_enable(WDTO_15MS);
 //		  while(1);
-                #else
-                #error unknown chip
-                #endif
-        }
+            #else
+            #error unknown chip
+            #endif
+    }
 
-        if ((clunetSendingState == CLUNET_SENDING_STATE_IDLE) || (clunetCurrentPrio <= CLUNET_PRIORITY_MESSAGE))
-        {
-                if (command == CLUNET_COMMAND_DISCOVERY) // Ответ на поиск устройств
-                {
-                    int len = 0;
-                    if (devName)
-                        len = strlen(devName);
-                    clunetSendingState = CLUNET_SENDING_STATE_PREINIT;
-                    send(src_address, CLUNET_PRIORITY_MESSAGE, CLUNET_COMMAND_DISCOVERY_RESPONSE, devName, len);
-                }
-                else if (command == CLUNET_COMMAND_PING) // Ответ на пинг
-                {
-                        clunetSendingState = CLUNET_SENDING_STATE_PREINIT;
-                        send(src_address, CLUNET_PRIORITY_COMMAND, CLUNET_COMMAND_PING_REPLY, data, size);
-                }
-        }
-
-        if (on_data_received)
-                (*on_data_received)(src_address, dst_address, command, data, size);
-
-        if ((clunetSendingState == CLUNET_SENDING_STATE_WAITING_LINE) && !CLUNET_READING) // Если есть неотосланные данные, шлём, линия освободилась
-        {
+    if ((clunetSendingState == CLUNET_SENDING_STATE_IDLE) || (clunetCurrentPrio <= CLUNET_PRIORITY_MESSAGE))
+    {
+            if (command == CLUNET_COMMAND_DISCOVERY) // Ответ на поиск устройств
+            {
+                int len = 0;
+                if (devName)
+                    len = strlen(devName);
                 clunetSendingState = CLUNET_SENDING_STATE_PREINIT;
-                start_send();
-        }
+                send(src_address, CLUNET_PRIORITY_MESSAGE, CLUNET_COMMAND_DISCOVERY_RESPONSE, devName, len);
+            }
+            else if (command == CLUNET_COMMAND_PING) // Ответ на пинг
+            {
+                    clunetSendingState = CLUNET_SENDING_STATE_PREINIT;
+                    send(src_address, CLUNET_PRIORITY_COMMAND, CLUNET_COMMAND_PING_REPLY, data, size);
+            }
+    }
+
+    if (on_data_received)
+            (*on_data_received)(src_address, dst_address, command, data, size);
+
+    if ((clunetSendingState == CLUNET_SENDING_STATE_WAITING_LINE) && !CLUNET_READING) // Если есть неотосланные данные, шлём, линия освободилась
+    {
+            clunetSendingState = CLUNET_SENDING_STATE_PREINIT;
+            start_send();
+    }
 }
 
 ISR(CLUNET_TIMER_OVF_VECTOR)
@@ -349,44 +353,44 @@ void ISR_CLUNET_INT_VECTOR()
 
 void Clunet::init()
 {
-        attachInterrupt(0, ISR_CLUNET_INT_VECTOR, CHANGE);
-        sei();
-        CLUNET_SEND_INIT;
-        CLUNET_READ_INIT;
-        CLUNET_TIMER_INIT;
-        CLUNET_INIT_INT;
+    attachInterrupt(0, ISR_CLUNET_INT_VECTOR, CHANGE);
+    sei();
+    CLUNET_SEND_INIT;
+    CLUNET_READ_INIT;
+    CLUNET_TIMER2_INIT;
 #ifdef CLUNET_ENABLE_INT
-        CLUNET_ENABLE_INT;
+    CLUNET_ENABLE_INT;
 #warning CLUNET_ENABLE_INT is deprecated
 #endif	
-        #if defined(__AVR_ATmega8__)
-        char reset_source = MCUCSR;
-        #elif defined(__AVR_ATmega328P__)
-        char reset_source = MCUSR;
-        #else
-        #error unknown chip
-        #endif
-        send(CLUNET_BROADCAST_ADDRESS, CLUNET_PRIORITY_MESSAGE,	CLUNET_COMMAND_BOOT_COMPLETED, &reset_source, 1);
+    #if defined(__AVR_ATmega8__)
+    char reset_source = MCUCSR;
+    #elif defined(__AVR_ATmega328P__)
+    char reset_source = MCUSR;
+    #else
+    #error unknown chip
+    #endif
+    send(CLUNET_BROADCAST_ADDRESS, CLUNET_PRIORITY_MESSAGE,	CLUNET_COMMAND_BOOT_COMPLETED, &reset_source, 1);
 
-        #if defined(__AVR_ATmega8__)
-        MCUCSR = 0;
-        #elif defined(__AVR_ATmega328P__)
-        MCUSR = 0;
-        #endif
+    #if defined(__AVR_ATmega8__)
+    MCUCSR = 0;
+    #elif defined(__AVR_ATmega328P__)
+    MCUSR = 0;
+    #endif
 }
 
-int Clunet::ready_to_send() // Возвращает 0, если готов к передаче, иначе приоритет текущей задачи
+int Clunet::readyToSend() // Возвращает 0, если готов к передаче, иначе приоритет текущей задачи
 {
-        if (clunetSendingState == CLUNET_SENDING_STATE_IDLE) return 0;
-        return clunetCurrentPrio;
+    if (clunetSendingState == CLUNET_SENDING_STATE_IDLE)
+        return 0;
+    return clunetCurrentPrio;
 }
 
-void Clunet::set_on_data_received(void (*f)(unsigned char src_address, unsigned char dst_address, unsigned char command, char* data, unsigned char size))
+void Clunet::setOnDataReceived(void (*f)(unsigned char src_address, unsigned char dst_address, unsigned char command, char* data, unsigned char size))
 {	
-        on_data_received = f;
+    on_data_received = f;
 }
 
-void Clunet::set_on_data_received_sniff(void (*f)(unsigned char src_address, unsigned char dst_address, unsigned char command, char* data, unsigned char size))
+void Clunet::setOnDataReceivedSniff(void (*f)(unsigned char src_address, unsigned char dst_address, unsigned char command, char* data, unsigned char size))
 {	
     on_data_received_sniff = f;
 }
